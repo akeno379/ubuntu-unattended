@@ -4,6 +4,9 @@
 tmp="/tmp"  # destination folder to store the final iso file
 hostname="ubuntu"
 currentuser="$( whoami)"
+country="US"
+
+CURRENT_DATE_TIME=$(date '+%Y%m%d%H%M%S')
 
 # define spinner function for slow tasks
 # courtesy of http://fitnr.com/showing-a-bash-spinner.html
@@ -90,15 +93,15 @@ while true; do
     case $ubver in
         [1]* )  download_file="ubuntu-$prec-server-amd64.iso"           # filename of the iso to be downloaded
                 download_location="http://releases.ubuntu.com/$prec/"     # location of the file to be downloaded
-                new_iso_name="ubuntu-$prec-server-amd64-unattended.iso" # filename of the new iso file to be created
+                new_iso_name="ubuntu-$prec-server-amd64-un-$country-$CURRENT_DATE_TIME.iso" # filename of the new iso file to be created
                 break;;
         [2]* )  download_file="ubuntu-$trus-server-amd64.iso"             # filename of the iso to be downloaded
                 download_location="http://releases.ubuntu.com/$trus/"     # location of the file to be downloaded
-                new_iso_name="ubuntu-$trus-server-amd64-unattended.iso"   # filename of the new iso file to be created
+                new_iso_name="ubuntu-$trus-server-amd64-un-$country-$CURRENT_DATE_TIME.iso"   # filename of the new iso file to be created
                 break;;
         [3]* )  download_file="ubuntu-$xenn-server-amd64.iso"
                 download_location="http://releases.ubuntu.com/$xenn/"
-                new_iso_name="ubuntu-$xenn-server-amd64-unattended.iso"
+                new_iso_name="ubuntu-$xenn-server-amd64-un-$country-$CURRENT_DATE_TIME.iso"
                 break;;
         * ) echo " please answer [1], [2] or [3]";;
     esac
@@ -114,8 +117,9 @@ else
 fi
 
 # ask the user questions about his/her preferences
+read -ep " please enter your preferred country: " -i "${country}" country
 read -ep " please enter your preferred timezone: " -i "${timezone}" timezone
-read -ep " please enter your preferred username: " -i "netson" username
+read -ep " please enter your preferred username: " -i "sa" username
 read -sp " please enter your preferred password: " password
 printf "\n"
 read -sp " confirm your preferred password: " password2
@@ -144,11 +148,11 @@ if [[ ! -f $tmp/$download_file ]]; then
 	exit 1
 fi
 
-# download netson seed file
-seed_file="netson.seed"
+# download seed file
+seed_file="preseedOne.seed"
 if [[ ! -f $tmp/$seed_file ]]; then
     echo -n " downloading $seed_file: "
-    download "https://raw.githubusercontent.com/netson/ubuntu-unattended/master/$seed_file"
+    download "https://raw.githubusercontent.com/akeno379/ubuntu-unattended/master/$seed_file"
 fi
 
 # install required packages
@@ -202,23 +206,23 @@ sed -i -r 's/timeout\s+[0-9]+/timeout 1/g' $tmp/iso_new/isolinux/isolinux.cfg
 
 # set late command
 
-if [ $ub1604 == "yes" ]; then
-   late_command="apt-install wget; in-target wget --no-check-certificate -O /home/$username/start.sh https://github.com/netson/ubuntu-unattended/raw/master/start.sh ;\
-     in-target chmod +x /home/$username/start.sh ;"
-else 
-   late_command="chroot /target wget -O /home/$username/start.sh https://github.com/netson/ubuntu-unattended/raw/master/start.sh ;\
-     chroot /target chmod +x /home/$username/start.sh ;"
-fi
+#if [ $ub1604 == "yes" ]; then
+#   late_command="apt-install wget; in-target wget --no-check-certificate -O /home/$username/start.sh https://github.com/netson/ubuntu-unattended/raw/master/start.sh ;\
+#     in-target chmod +x /home/$username/start.sh ;"
+#else 
+#   late_command="chroot /target wget -O /home/$username/start.sh https://github.com/netson/ubuntu-unattended/raw/master/start.sh ;\
+#     chroot /target chmod +x /home/$username/start.sh ;"
+#fi
 
 
 
-# copy the netson seed file to the iso
+# copy the seed file to the iso
 cp -rT $tmp/$seed_file $tmp/iso_new/preseed/$seed_file
 
 # include firstrun script
-echo "
-# setup firstrun script
-d-i preseed/late_command                                    string      $late_command" >> $tmp/iso_new/preseed/$seed_file
+#echo "
+#setup firstrun script
+#d-i preseed/late_command                                    string      $late_command" >> $tmp/iso_new/preseed/$seed_file
 
 # generate the password hash
 pwhash=$(echo $password | mkpasswd -s -m sha-512)
@@ -230,19 +234,28 @@ sed -i "s@{{username}}@$username@g" $tmp/iso_new/preseed/$seed_file
 sed -i "s@{{pwhash}}@$pwhash@g" $tmp/iso_new/preseed/$seed_file
 sed -i "s@{{hostname}}@$hostname@g" $tmp/iso_new/preseed/$seed_file
 sed -i "s@{{timezone}}@$timezone@g" $tmp/iso_new/preseed/$seed_file
+sed -i "s@{{country}}@$country@g" $tmp/iso_new/preseed/$seed_file
 
 # calculate checksum for seed file
 seed_checksum=$(md5sum $tmp/iso_new/preseed/$seed_file)
 
 # add the autoinstall option to the menu
 sed -i "/label install/ilabel autoinstall\n\
-  menu label ^Autoinstall NETSON Ubuntu Server\n\
+  menu label ^Autoinstall Unattended Ubuntu Server\n\
   kernel /install/vmlinuz\n\
-  append file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz auto=true priority=high preseed/file=/cdrom/preseed/netson.seed preseed/file/checksum=$seed_checksum --" $tmp/iso_new/isolinux/txt.cfg
+  append file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz auto=true priority=high preseed/file=/cdrom/preseed/$seed_file preseed/file/checksum=$seed_checksum --" $tmp/iso_new/isolinux/txt.cfg
+
+# add the autoinstall option to the grub entry
+sed -i "/menuentry \"Install Ubuntu Server\" {/imenuentry \"AutoInstall Docukit Ubuntu Server\" {\n\
+  set gfxpayload=keep\n\
+  linux	/install/vmlinuz  file=/cdrom/preseed/ubuntu-server.seed auto=true priority=high preseed/file=/cdrom/preseed/$seed_file preseed/file/checksum=$seed_checksum --\n\
+  initrd	/install/initrd.gz\n\
+}" $tmp/iso_new/boot/grub/grub.cfg
+
 
 echo " creating the remastered iso"
 cd $tmp/iso_new
-(mkisofs -D -r -V "NETSON_UBUNTU" -cache-inodes -J -l -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -o $tmp/$new_iso_name . > /dev/null 2>&1) &
+(mkisofs -D -r -V "UNATTENDED_UBUNTU" -cache-inodes -J -l -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -o $tmp/$new_iso_name . > /dev/null 2>&1) &
 spinner $!
 
 # make iso bootable (for dd'ing to  USB stick)
@@ -265,6 +278,7 @@ echo " your username is: $username"
 echo " your password is: $password"
 echo " your hostname is: $hostname"
 echo " your timezone is: $timezone"
+echo " your country is: $country"
 echo
 
 # unset vars
@@ -272,6 +286,7 @@ unset username
 unset password
 unset hostname
 unset timezone
+unset country
 unset pwhash
 unset download_file
 unset download_location
