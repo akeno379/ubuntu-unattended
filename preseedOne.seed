@@ -16,7 +16,7 @@ d-i debconf/language                                        string      en_US:en
 
 # network settings
 d-i netcfg/choose_interface                                 select      auto
-d-i netcfg/enable                                           boolean     false
+d-i netcfg/enable                                           boolean     true
 d-i netcfg/dhcp_timeout                                     string      5
 d-i netcfg/get_hostname                                     string      {{hostname}}
 d-i netcfg/get_domain                                       string      {{hostname}}
@@ -80,11 +80,12 @@ d-i partman-md/confirm_nooverwrite                          boolean     true
 d-i partman-auto/method                                     string      lvm
 d-i partman-auto-lvm/guided_size                            string      max
 d-i partman-partitioning/confirm_write_new_label            boolean     true
+d-i partman-efi/non_efi_system                              boolean     true
 
 # grub boot loader
 d-i grub-installer/bootdev                                  string      /dev/sda
-d-i grub-installer/only_debian                              boolean 	true
-d-i grub-installer/with_other_os 			                boolean     true
+d-i grub-installer/only_debian                              boolean 	  true
+d-i grub-installer/with_other_os 			                      boolean     true
 
 # finish installation
 d-i finish-install/keep-consoles                            boolean     true
@@ -93,6 +94,4 @@ d-i cdrom-detect/eject                                      boolean     true
 d-i debian-installer/exit/halt                              boolean     false
 d-i debian-installer/exit/poweroff                          boolean     false
 
-
-#d-i preseed/late_command    string  sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="console=tty0 console=ttyS0"/g; s/TIMEOUT=0/TIMEOUT=1/g; s/# *GRUB_TERMINAL=console/GRUB_TERMINAL=console/g' /target/etc/default/grub; in-target update-grub
-d-i preseed/late_command    string sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=""/g' /target/etc/default/grub; in-target update-grub; in-target add-apt-repository "deb http://archive.ubuntu.com/ubuntu $(lsb_release -sc) main universe restricted multiverse"
+d-i preseed/late_command    string sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=""/g' /target/etc/default/grub; in-target update-grub; in-target add-apt-repository "deb http://archive.ubuntu.com/ubuntu xenial main universe restricted multiverse"; in-target add-apt-repository "deb http://archive.ubuntu.com/ubuntu xenial-updates main universe restricted multiverse"
